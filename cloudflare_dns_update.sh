@@ -10,34 +10,48 @@
 
 CONFIG_PATH=/data/options.json
 
-zone_identifier=$(jq --raw-output  ".zone_identifier" $CONFIG_PATH)
-cloudflare_email=$(jq --raw-output  ".cloudflare_email" $CONFIG_PATH)
-cloudflare_auth_key=$(jq --raw-output  ".cloudflare_auth_key" $CONFIG_PATH)
-cloudflare_record_a_filter=$(jq --raw-output  ".cloudflare_record_a_filter" $CONFIG_PATH)
+zone_identifier=$(jq --raw-output  ".zone_identifier" ${CONFIG_PATH})
+cloudflare_email=$(jq --raw-output  ".cloudflare_email" ${CONFIG_PATH})
+cloudflare_auth_key=$(jq --raw-output  ".cloudflare_auth_key" ${CONFIG_PATH})
+cloudflare_record_a_filter=$(jq --raw-output  ".cloudflare_record_a_filter" ${CONFIG_PATH})
 
 #hourstamp=$(date +"%F-%H")
 publicip=$(curl https://api.ipify.org  2>/dev/null)
+domains_to_purge=""
 
 dns_records=$(curl -X GET "https://api.cloudflare.com/client/v4/zones/$zone_identifier/dns_records?type=A" -H "X-Auth-Email: $cloudflare_email" -H "X-Auth-Key: $cloudflare_auth_key" -H "Content-Type: application/json"  2>/dev/null)
-dns_records_length=$(echo $dns_records | jq '.result | length')
+dns_records_length=$(echo ${dns_records} | jq '.result | length')
 
 for i in `seq 0 $((dns_records_length-1))`;
 do
-    dns_records_item_id=$(echo $dns_records | jq --raw-output ".result[$i].id")
-    dns_records_item_name=$(echo $dns_records | jq --raw-output ".result[$i].name")
-    dns_records_item_type=$(echo $dns_records | jq --raw-output ".result[$i].type")
-    dns_records_item_content=$(echo $dns_records | jq --raw-output ".result[$i].content")
+    dns_records_item_id=$(echo ${dns_records} | jq --raw-output ".result[$i].id")
+    dns_records_item_name=$(echo ${dns_records} | jq --raw-output ".result[$i].name")
+    dns_records_item_type=$(echo ${dns_records} | jq --raw-output ".result[$i].type")
+    dns_records_item_content=$(echo ${dns_records} | jq --raw-output ".result[$i].content")
 
-    if [[ $dns_records_item_name == *${cloudflare_record_a_filter}* && $dns_records_item_content != $publicip ]];
+    if [[ ${dns_records_item_name} == *${cloudflare_record_a_filter}* && ${dns_records_item_content} != ${publicip} ]];
     then
+        domains_to_purge+="\"${dns_records_item_name}\","
         res=$(curl -X PUT "https://api.cloudflare.com/client/v4/zones/$zone_identifier/dns_records/$dns_records_item_id" \
             -H "X-Auth-Email: $cloudflare_email" \
             -H "X-Auth-Key: $cloudflare_auth_key" \
             -H "Content-Type: application/json" \
-            --data '{"type":'\"$dns_records_item_type\"',"name":'\"$dns_records_item_name\"',"content":'\"$publicip\"',"ttl":1,"proxied":true}'  2>/dev/null)
+            --data '{"type":'\"${dns_records_item_type}\"',"name":'\"${dns_records_item_name}\"',"content":'\"${publicip}\"',"ttl":1,"proxied":true}'  2>/dev/null)
         echo "-> Record Updated: $dns_records_item_id: name=$dns_records_item_name type=$dns_records_item_type content=$dns_records_item_content"
     fi
-done    
+done
+
+if [[ ! -z "${domains_to_purge}" ]]; then
+    # Purge cache for each new IP
+    res_purge=$(curl -X POST "https://api.cloudflare.com/client/v4/zones/${zone_identifier}/purge_cache" \
+    -H "X-Auth-Email: ${cloudflare_email}" \
+    -H "X-Auth-Key: ${cloudflare_auth_key}" \
+    -H "Content-Type: application/json" \
+    --data '{"purge_everything":true}')
+    # If you have enterprise plan you can purge for single host
+    #  --data '{"hosts":['${domains_to_purge%?}']}')
+     echo ${res_purge}
+fi
 #printf "\n$(date) : Changed IP address of drive.dwarak.in to $publicip \n" >> /var/log/cloudflare/dns-drive-dwarak-in-update/$hourstamp.log
 
 exit 0

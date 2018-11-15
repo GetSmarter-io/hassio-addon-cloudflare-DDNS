@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 ######################################################################################
 # CLOUDFLARE DNS UPDATE SCRIPT
 # Documentation : https://api.cloudflare.com/#dns-records-for-a-zone-list-dns-records

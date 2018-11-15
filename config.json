@@ -1,0 +1,20 @@
+{
+  "name": "Cloudflare DDNS",
+  "version": "1",
+  "slug": "cloudflare-ddns",
+  "description": "Cloudflare DDNS Extension",
+  "startup": "before",
+  "boot": "auto",
+  "options": {
+    "zone_identifier": null,
+    "cloudflare_email": null,
+    "cloudflare_auth_key": null,
+    "cloudflare_record_a_filter": null
+  },
+  "schema": {
+    "zone_identifier": "str",
+    "cloudflare_email": "str",
+    "cloudflare_auth_key": "str",
+    "cloudflare_record_a_filter": "str"
+  }
+}
